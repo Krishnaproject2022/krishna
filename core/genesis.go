@@ -216,10 +216,11 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, genesis *Genesis, override
 		rawdb.WriteChainConfig(db, stored, newcfg)
 		return newcfg, stored, nil
 	}
+
 	// Special case: don't change the existing config of a non-mainnet chain if no new
 	// config is supplied. These chains would get AllProtocolChanges (and a compat error)
 	// if we just continued here.
-	if genesis == nil && stored != params.MainnetGenesisHash {
+	if genesis == nil && stored != params.MainnetGenesisHash && (stored != params.KrishnaGenesisHash && stored != params.KrishnaTestGenesisHash) {
 		return storedcfg, stored, nil
 	}
 	// Check config compatibility and write the config. Compatibility errors
@@ -248,6 +249,10 @@ func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 		return params.RinkebyChainConfig
 	case ghash == params.GoerliGenesisHash:
 		return params.GoerliChainConfig
+	case ghash == params.KrishnaGenesisHash:
+		return params.KrishnaChainConfig
+	case ghash == params.KrishnaTestGenesisHash:
+		return params.KrishnaTestChainConfig
 	default:
 		return params.AllEthashProtocolChanges
 	}
@@ -351,13 +356,21 @@ func GenesisBlockForTesting(db ethdb.Database, addr common.Address, balance *big
 
 // DefaultGenesisBlock returns the Ethereum main net genesis block.
 func DefaultGenesisBlock() *Genesis {
+	//return &Genesis{
+	//	Config:     params.MainnetChainConfig,
+	//	Nonce:      66,
+	//	ExtraData:  hexutil.MustDecode("0x11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa"),
+	//	GasLimit:   5000,
+	//	Difficulty: big.NewInt(17179869184),
+	//	Alloc:      decodePrealloc(mainnetAllocData),
+	//}
 	return &Genesis{
 		Config:     params.MainnetChainConfig,
 		Nonce:      66,
-		ExtraData:  hexutil.MustDecode("0x11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa"),
-		GasLimit:   5000,
-		Difficulty: big.NewInt(17179869184),
-		Alloc:      decodePrealloc(mainnetAllocData),
+		ExtraData:  nil,
+		GasLimit:   150000,
+		Difficulty: big.NewInt(600000),
+		Alloc:      decodePrealloc(krishnaAllocData),
 	}
 }
 

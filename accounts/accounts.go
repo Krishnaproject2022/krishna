@@ -39,6 +39,7 @@ const (
 	MimetypeDataWithValidator = "data/validator"
 	MimetypeTypedData         = "data/typed"
 	MimetypeClique            = "application/x-clique-header"
+	MimetypePoseidon          = "application/x-poseidon-header"
 	MimetypeTextPlain         = "text/plain"
 )
 
@@ -75,6 +76,9 @@ type Wallet interface {
 	// of. For hierarchical deterministic wallets, the list will not be exhaustive,
 	// rather only contain the accounts explicitly pinned during account derivation.
 	Accounts() []Account
+
+	VrfProve(alpha []byte) (beta, pi []byte, err error)
+	VrfVerify(alpha, pi []byte) (beta []byte, err error)
 
 	// Contains returns whether an account is part of this particular wallet or not.
 	Contains(account Account) bool

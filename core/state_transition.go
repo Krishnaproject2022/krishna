@@ -18,17 +18,19 @@ package core
 
 import (
 	"fmt"
-	"math"
-	"math/big"
-
 	"github.com/ethereum/go-ethereum/common"
 	cmath "github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/core/systemcontracts"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"math"
+	"math/big"
 )
 
+// emptyCodeHash is used by create to ensure deployment is disallowed to already
+// deployed contract addresses (relevant after the account abstraction).
 var emptyCodeHash = crypto.Keccak256Hash(nil)
 
 /*
@@ -311,15 +313,17 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		st.state.PrepareAccessList(msg.From(), msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
 	}
 	var (
-		ret   []byte
-		vmerr error // vm errors do not effect consensus and are therefore not assigned to err
+		ret          []byte
+		contractAddr common.Address
+		vmerr        error // vm errors do not effect consensus and are therefore not assigned to err
 	)
 	if contractCreation {
-		ret, _, st.gas, vmerr = st.evm.Create(sender, st.data, st.gas, st.value)
+		ret, contractAddr, st.gas, vmerr = st.evm.Create(sender, st.data, st.gas, st.value)
 	} else {
 		// Increment the nonce for the next transaction
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 		ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
+		contractAddr = st.to()
 	}
 
 	if !london {
@@ -333,7 +337,12 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	if london {
 		effectiveTip = cmath.BigMin(st.gasTipCap, new(big.Int).Sub(st.gasFeeCap, st.evm.Context.BaseFee))
 	}
-	st.state.AddBalance(st.evm.Context.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), effectiveTip))
+	coinbaseReward := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), effectiveTip)
+
+	ownerReward := st.contractOwnerReward(contractAddr, coinbaseReward)
+	coinbaseReward = coinbaseReward.Sub(coinbaseReward, ownerReward)
+
+	st.state.AddBalance(st.evm.Context.Coinbase, coinbaseReward)
 
 	return &ExecutionResult{
 		UsedGas:    st.gasUsed(),
@@ -342,12 +351,28 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	}, nil
 }
 
-func (st *StateTransition) refundGas(refundQuotient uint64) {
-	// Apply refund counter, capped to a refund quotient
-	refund := st.gasUsed() / refundQuotient
-	if refund > st.state.GetRefund() {
-		refund = st.state.GetRefund()
+func (st *StateTransition) isContract(address common.Address) bool {
+	contractHash := st.evm.StateDB.GetCodeHash(address)
+	if contractHash != (common.Hash{}) && contractHash != emptyCodeHash {
+		return true
 	}
+
+	return false
+}
+
+func (st *StateTransition) refundGas(refundQuotient uint64) {
+	var refund uint64
+	if systemcontracts.IsSystemTransition(st.msg.To(), st.msg.Data()) {
+		// systemTransition, 0 fee
+		refund = st.gasUsed()
+	} else {
+		// Apply refund counter, capped to a refund quotient
+		refund = st.gasUsed() / refundQuotient
+		if refund > st.state.GetRefund() {
+			refund = st.state.GetRefund()
+		}
+	}
+
 	st.gas += refund
 
 	// Return ETH for remaining gas, exchanged at the original rate.
@@ -362,4 +387,24 @@ func (st *StateTransition) refundGas(refundQuotient uint64) {
 // gasUsed returns the amount of gas used up by the state transition.
 func (st *StateTransition) gasUsed() uint64 {
 	return st.initialGas - st.gas
+}
+
+func (st *StateTransition) contractOwnerReward(contractAddr common.Address, coinbaseReward *big.Int) *big.Int {
+	ownerHash := st.state.GetState(contractAddr, params.ContractOwnerHash)
+	if ownerHash == (common.Hash{}) {
+		return big.NewInt(0)
+	}
+	ownerAddr := common.BytesToAddress(ownerHash.Bytes())
+	if st.isContract(ownerAddr) {
+		return big.NewInt(0)
+	}
+	ownerReward := new(big.Int).Mul(coinbaseReward, params.ContractRewardRate)
+	ownerReward = ownerReward.Div(ownerReward, params.ContractRewardBase)
+
+	if ownerReward.Cmp(common.Big0) <= 0 {
+		return big.NewInt(0)
+	}
+
+	st.state.AddBalance(ownerAddr, ownerReward)
+	return ownerReward
 }

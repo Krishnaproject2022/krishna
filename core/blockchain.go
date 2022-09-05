@@ -91,6 +91,8 @@ const (
 	maxTimeFutureBlocks = 30
 	TriesInMemory       = 128
 
+	maxReorgLimit = 16
+
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	//
 	// Changelog:
@@ -341,7 +343,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	// The first thing the node will do is reconstruct the verification data for
 	// the head block (ethash cache or clique voting snapshot). Might as well do
 	// it in advance.
-	bc.engine.VerifyHeader(bc, bc.CurrentHeader(), true)
+	//bc.engine.VerifyHeader(bc, bc.CurrentHeader(), true)
 
 	// Check the current state of the block hashes and make sure that we do not have any of the bad blocks in our chain
 	for hash := range BadHashes {
@@ -1654,6 +1656,15 @@ func (bc *BlockChain) InsertChainWithoutSealVerification(block *types.Block) (in
 	return n, err
 }
 
+func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, error) {
+	for i := range chain {
+		if _, err := bc.insertChainRaw(chain[i:i+1], verifySeals); err != nil {
+			return i, err
+		}
+	}
+	return len(chain), nil
+}
+
 // insertChain is the internal implementation of InsertChain, which assumes that
 // 1) chains are contiguous, and 2) The chain mutex is held.
 //
@@ -1662,7 +1673,7 @@ func (bc *BlockChain) InsertChainWithoutSealVerification(block *types.Block) (in
 // racey behaviour. If a sidechain import is in progress, and the historic state
 // is imported, but then new canon-head is added before the actual sidechain
 // completes, then the historic state could be pruned again
-func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, error) {
+func (bc *BlockChain) insertChainRaw(chain types.Blocks, verifySeals bool) (int, error) {
 	// If the chain is terminating, don't even bother starting up
 	if atomic.LoadInt32(&bc.procInterrupt) == 1 {
 		return 0, nil
@@ -2190,9 +2201,10 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	if len(oldChain) > 0 && len(newChain) > 0 {
 		logFn := log.Info
 		msg := "Chain reorg detected"
-		if len(oldChain) > 63 {
+		largeReorg := len(oldChain) > maxReorgLimit
+		if largeReorg {
 			msg = "Large chain reorg detected"
-			logFn = log.Warn
+			return fmt.Errorf(msg)
 		}
 		logFn(msg, "number", commonBlock.Number(), "hash", commonBlock.Hash(),
 			"drop", len(oldChain), "dropfrom", oldChain[0].Hash(), "add", len(newChain), "addfrom", newChain[0].Hash())

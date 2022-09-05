@@ -51,7 +51,7 @@ var (
 	gitCommit = ""
 	gitDate   = ""
 	// The app that holds all commands and flags.
-	app = flags.NewApp(gitCommit, gitDate, "the go-ethereum command line interface")
+	app = flags.NewApp(gitCommit, gitDate, "the krishna command line interface")
 	// flags that configure the node
 	nodeFlags = []cli.Flag{
 		utils.IdentityFlag,
@@ -205,7 +205,7 @@ func init() {
 	// Initialize the CLI app and start Geth
 	app.Action = geth
 	app.HideVersion = true // we have a command to print the version
-	app.Copyright = "Copyright 2013-2021 The go-ethereum Authors"
+	app.Copyright = "Copyright 2013-2021 The Krishna Authors"
 	app.Commands = []cli.Command{
 		// See chaincmd.go:
 		initCommand,
@@ -281,7 +281,7 @@ func prepare(ctx *cli.Context) {
 		log.Info("Starting Geth in ephemeral dev mode...")
 
 	case !ctx.GlobalIsSet(utils.NetworkIdFlag.Name):
-		log.Info("Starting Geth on Ethereum mainnet...")
+		log.Info("Starting Geth on Krishna mainnet...")
 	}
 	// If we're a full node on mainnet without --cache specified, bump default cache allowance
 	if ctx.GlobalString(utils.SyncModeFlag.Name) != "light" && !ctx.GlobalIsSet(utils.CacheFlag.Name) && !ctx.GlobalIsSet(utils.NetworkIdFlag.Name) {
@@ -309,6 +309,8 @@ func prepare(ctx *cli.Context) {
 // It creates a default node based on the command line arguments and runs it in
 // blocking mode, waiting for it to be shut down.
 func geth(ctx *cli.Context) error {
+	fmt.Println(logo)
+
 	if args := ctx.Args(); len(args) > 0 {
 		return fmt.Errorf("invalid command: %q", args[0])
 	}

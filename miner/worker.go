@@ -19,6 +19,7 @@ package miner
 import (
 	"bytes"
 	"errors"
+	"github.com/ethereum/go-ethereum/consensus/poseidon"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -212,6 +213,10 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		resubmitIntervalCh: make(chan time.Duration),
 		resubmitAdjustCh:   make(chan *intervalAdjust, resubmitAdjustChanSize),
 	}
+	if _, isPoSA := engine.(consensus.PoSA); isPoSA {
+		worker.disablePreseal()
+	}
+
 	// Subscribe NewTxsEvent for tx pool
 	worker.txsSub = eth.TxPool().SubscribeNewTxsEvent(worker.txsCh)
 	// Subscribe events for blockchain
@@ -399,7 +404,8 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		case <-timer.C:
 			// If mining is running resubmit a new work cycle periodically to pull in
 			// higher priced transactions. Disable this overhead for pending blocks.
-			if w.isRunning() && (w.chainConfig.Clique == nil || w.chainConfig.Clique.Period > 0) {
+			if w.isRunning() && ((w.chainConfig.Ethash != nil) || (w.chainConfig.Clique != nil &&
+				w.chainConfig.Clique.Period > 0) || (w.chainConfig.Poseidon != nil && w.chainConfig.Poseidon.Period > 0)) {
 				// Short circuit if no new transaction arrives.
 				if atomic.LoadInt32(&w.newTxs) == 0 {
 					timer.Reset(recommit)
@@ -457,6 +463,9 @@ func (w *worker) mainLoop() {
 
 		case ev := <-w.chainSideCh:
 			// Short circuit for duplicate side blocks
+			if _, ok := w.engine.(*poseidon.Poseidon); ok {
+				continue
+			}
 			if _, exist := w.localUncles[ev.Block.Hash()]; exist {
 				continue
 			}
@@ -526,7 +535,8 @@ func (w *worker) mainLoop() {
 				// Special case, if the consensus engine is 0 period clique(dev mode),
 				// submit mining work here since all empty submission will be rejected
 				// by clique. Of course the advance sealing(empty submission) is disabled.
-				if w.chainConfig.Clique != nil && w.chainConfig.Clique.Period == 0 {
+				if (w.chainConfig.Clique != nil && w.chainConfig.Clique.Period == 0) ||
+					(w.chainConfig.Poseidon != nil && w.chainConfig.Poseidon.Period == 0) {
 					w.commitNewWork(nil, true, time.Now().Unix())
 				}
 			}
@@ -716,7 +726,7 @@ func (w *worker) commitUncle(env *environment, uncle *types.Header) error {
 }
 
 // updateSnapshot updates pending snapshot block and state.
-// Note this function assumes the current variable is thread safe.
+// Note this function assumes the current variable is thread safe .
 func (w *worker) updateSnapshot() {
 	w.snapshotMu.Lock()
 	defer w.snapshotMu.Unlock()
@@ -747,6 +757,7 @@ func (w *worker) updateSnapshot() {
 	)
 	w.snapshotReceipts = copyReceipts(w.current.receipts)
 	w.snapshotState = w.current.state.Copy()
+	w.snapshotState.ClearAccessList()
 }
 
 func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
@@ -917,6 +928,13 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		}
 		header.Coinbase = w.coinbase
 	}
+
+	if spos, isPoSA := w.engine.(consensus.PoSA); isPoSA && w.isRunning() {
+		if err := spos.Heartbeat(num); err != nil {
+			log.Warn("Heartbeat failed", "err", err)
+		}
+	}
+
 	if err := w.engine.Prepare(w.chain, header); err != nil {
 		log.Error("Failed to prepare header for mining", "err", err)
 		return
@@ -988,6 +1006,18 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	if len(pending) == 0 && atomic.LoadUint32(&w.noempty) == 0 {
 		w.updateSnapshot()
 		return
+	}
+	delete(pending, w.coinbase) //Delete my pending transactions
+
+	spos, isPoSA := w.engine.(consensus.PoSA)
+	if isPoSA && w.isRunning() {
+		txs, err := spos.GetSystemTransaction(w.current.signer, w.current.state, w.current.header.BaseFee, big.NewInt(0))
+		if err != nil {
+			log.Warn("Failed to GetSystemTransaction", "err", err)
+		}
+		if err == nil && w.commitTransactions(txs, w.coinbase, new(int32)) {
+			return
+		}
 	}
 	// Split the pending transactions into locals and remotes
 	localTxs, remoteTxs := make(map[common.Address]types.Transactions), pending

@@ -18,6 +18,8 @@
 package ethconfig
 
 import (
+	"github.com/ethereum/go-ethereum/consensus/poseidon"
+	"github.com/ethereum/go-ethereum/internal/ethapi"
 	"math/big"
 	"os"
 	"os/user"
@@ -71,7 +73,7 @@ var Defaults = Config{
 		DatasetsOnDisk:   2,
 		DatasetsLockMmap: false,
 	},
-	NetworkId:               1,
+	NetworkId:               params.KrishnaChainConfig.ChainID.Uint64(),
 	TxLookupLimit:           2350000,
 	LightPeers:              100,
 	UltraLightFraction:      75,
@@ -84,13 +86,13 @@ var Defaults = Config{
 	SnapshotCache:           102,
 	Miner: miner.Config{
 		GasCeil:  8000000,
-		GasPrice: big.NewInt(params.GWei),
+		GasPrice: big.NewInt(100 * params.GWei),
 		Recommit: 3 * time.Second,
 	},
 	TxPool:      core.DefaultTxPoolConfig,
 	RPCGasCap:   50000000,
 	GPO:         FullNodeGPO,
-	RPCTxFeeCap: 1, // 1 ether
+	RPCTxFeeCap: 10, // 10 ether
 }
 
 func init() {
@@ -203,10 +205,13 @@ type Config struct {
 }
 
 // CreateConsensusEngine creates a consensus engine for the given chain configuration.
-func CreateConsensusEngine(stack *node.Node, chainConfig *params.ChainConfig, config *ethash.Config, notify []string, noverify bool, db ethdb.Database) consensus.Engine {
+func CreateConsensusEngine(stack *node.Node, chainConfig *params.ChainConfig, config *ethash.Config, notify []string, noverify bool, db ethdb.Database, ee *ethapi.PublicBlockChainAPI, genesisHash common.Hash) consensus.Engine {
 	// If proof-of-authority is requested, set it up
 	if chainConfig.Clique != nil {
 		return clique.New(chainConfig.Clique, db)
+	}
+	if chainConfig.Poseidon != nil {
+		return poseidon.New(chainConfig, db, ee, genesisHash)
 	}
 	// Otherwise assume proof-of-work
 	switch config.PowMode {

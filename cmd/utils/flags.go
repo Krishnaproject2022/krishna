@@ -624,7 +624,7 @@ var (
 	ListenPortFlag = cli.IntFlag{
 		Name:  "port",
 		Usage: "Network listening port",
-		Value: 30303,
+		Value: 37226,
 	}
 	BootnodesFlag = cli.StringFlag{
 		Name:  "bootnodes",
@@ -1174,7 +1174,7 @@ func SetP2PConfig(ctx *cli.Context, cfg *p2p.Config) {
 	if lightClient {
 		ethPeers = 0
 	}
-	log.Info("Maximum peer count", "ETH", ethPeers, "LES", lightPeers, "total", cfg.MaxPeers)
+	log.Info("Maximum peer count", "KSA", ethPeers, "LES", lightPeers, "total", cfg.MaxPeers)
 
 	if ctx.GlobalIsSet(MaxPendingPeersFlag.Name) {
 		cfg.MaxPendingPeers = ctx.GlobalInt(MaxPendingPeersFlag.Name)
@@ -1911,6 +1911,7 @@ func MakeChain(ctx *cli.Context, stack *node.Node) (chain *core.BlockChain, chai
 	if err != nil {
 		Fatalf("Can't create BlockChain: %v", err)
 	}
+	chain.Engine().VerifyHeader(chain, chain.CurrentHeader(), true)
 	return chain, chainDb
 }
 

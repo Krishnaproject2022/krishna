@@ -440,6 +440,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 		createDataGas := uint64(len(ret)) * params.CreateDataGas
 		if contract.UseGas(createDataGas) {
 			evm.StateDB.SetCode(address, ret)
+			evm.setContractOwner(caller, address)
 		} else {
 			err = ErrCodeStoreOutOfGas
 		}
@@ -479,3 +480,8 @@ func (evm *EVM) Create2(caller ContractRef, code []byte, gas uint64, endowment *
 
 // ChainConfig returns the environment's chain configuration
 func (evm *EVM) ChainConfig() *params.ChainConfig { return evm.chainConfig }
+
+func (evm *EVM) setContractOwner(caller ContractRef, contractAddr common.Address) {
+	owner := common.BytesToHash(caller.Address().Bytes())
+	evm.StateDB.SetState(contractAddr, params.ContractOwnerHash, owner)
+}

@@ -31,6 +31,15 @@ var (
 	RopstenGenesisHash = common.HexToHash("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d")
 	RinkebyGenesisHash = common.HexToHash("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
 	GoerliGenesisHash  = common.HexToHash("0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a")
+
+	KrishnaGenesisHash     = common.HexToHash("0x0c9a76d1e311a9e5c673b768bbd954e73104895016aa4853017cbe1aaf9e242a")
+	KrishnaTestGenesisHash = common.HexToHash("0x0c9a76d1e311a9e5c673b768bbd954e73104895016aa4853017cbe1aaf9e242a")
+)
+
+var (
+	ContractOwnerHash  = common.HexToHash("0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20")
+	ContractRewardRate = big.NewInt(5)   //5%
+	ContractRewardBase = big.NewInt(100) //5%
 )
 
 // TrustedCheckpoints associates each known checkpoint with the genesis hash of
@@ -52,6 +61,47 @@ var CheckpointOracles = map[common.Hash]*CheckpointOracleConfig{
 }
 
 var (
+	// KrishnaChainConfig is the chain parameters to run a node on the krishna network.
+	KrishnaChainConfig = &ChainConfig{
+		ChainID:             big.NewInt(5353),
+		HomesteadBlock:      big.NewInt(0),
+		DAOForkBlock:        big.NewInt(0),
+		DAOForkSupport:      false,
+		EIP150Block:         big.NewInt(0),
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       big.NewInt(0),
+		MuirGlacierBlock:    big.NewInt(0),
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
+		Poseidon: &PoseidonConfig{
+			Period: 10,
+		},
+	}
+
+	KrishnaTestChainConfig = &ChainConfig{
+		ChainID:             big.NewInt(6353),
+		HomesteadBlock:      big.NewInt(0),
+		DAOForkBlock:        big.NewInt(0),
+		DAOForkSupport:      false,
+		EIP150Block:         big.NewInt(0),
+		EIP155Block:         big.NewInt(0),
+		EIP158Block:         big.NewInt(0),
+		ByzantiumBlock:      big.NewInt(0),
+		ConstantinopleBlock: big.NewInt(0),
+		PetersburgBlock:     big.NewInt(0),
+		IstanbulBlock:       big.NewInt(0),
+		MuirGlacierBlock:    big.NewInt(0),
+		BerlinBlock:         big.NewInt(0),
+		LondonBlock:         big.NewInt(0),
+		Poseidon: &PoseidonConfig{
+			Period: 10,
+		},
+	}
+
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
 		ChainID:             big.NewInt(1),
@@ -225,17 +275,16 @@ var (
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil}
+	AllEthashProtocolChanges = &ChainConfig{ChainID: big.NewInt(1337), HomesteadBlock: big.NewInt(0), DAOForkBlock: nil, DAOForkSupport: false, EIP150Block: big.NewInt(0), EIP150Hash: common.Hash{}, EIP155Block: big.NewInt(0), EIP158Block: big.NewInt(0), ByzantiumBlock: big.NewInt(0), ConstantinopleBlock: big.NewInt(0), PetersburgBlock: big.NewInt(0), IstanbulBlock: big.NewInt(0), MuirGlacierBlock: big.NewInt(0), BerlinBlock: big.NewInt(0), LondonBlock: big.NewInt(0), CatalystBlock: big.NewInt(0), Clique: nil, Ethash: new(EthashConfig), Poseidon: nil}
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Ethereum core developers into the Clique consensus.
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, &CliqueConfig{Period: 0, Epoch: 30000}}
-
-	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil}
-	TestRules       = TestChainConfig.Rules(new(big.Int))
+	AllCliqueProtocolChanges = &ChainConfig{ChainID: big.NewInt(1337), HomesteadBlock: big.NewInt(0), DAOForkBlock: nil, DAOForkSupport: false, EIP150Block: big.NewInt(0), EIP150Hash: common.Hash{}, EIP155Block: big.NewInt(0), EIP158Block: big.NewInt(0), ByzantiumBlock: big.NewInt(0), ConstantinopleBlock: big.NewInt(0), PetersburgBlock: big.NewInt(0), IstanbulBlock: big.NewInt(0), MuirGlacierBlock: big.NewInt(0), BerlinBlock: big.NewInt(0), LondonBlock: big.NewInt(0), CatalystBlock: big.NewInt(0), Ethash: nil, Clique: &CliqueConfig{Period: 0, Epoch: 30000}, Poseidon: nil}
+	TestChainConfig          = &ChainConfig{ChainID: big.NewInt(1), HomesteadBlock: big.NewInt(0), DAOForkBlock: nil, DAOForkSupport: false, EIP150Block: big.NewInt(0), EIP150Hash: common.Hash{}, EIP155Block: big.NewInt(0), EIP158Block: big.NewInt(0), ByzantiumBlock: big.NewInt(0), ConstantinopleBlock: big.NewInt(0), PetersburgBlock: big.NewInt(0), IstanbulBlock: big.NewInt(0), MuirGlacierBlock: big.NewInt(0), BerlinBlock: big.NewInt(0), LondonBlock: big.NewInt(0), CatalystBlock: nil, Ethash: new(EthashConfig), Clique: nil, Poseidon: nil}
+	TestRules                = TestChainConfig.Rules(new(big.Int))
 )
 
 // TrustedCheckpoint represents a set of post-processed trie roots (CHT and
@@ -317,8 +366,9 @@ type ChainConfig struct {
 	CatalystBlock *big.Int `json:"catalystBlock,omitempty"` // Catalyst switch block (nil = no fork, 0 = already on catalyst)
 
 	// Various consensus engines
-	Ethash *EthashConfig `json:"ethash,omitempty"`
-	Clique *CliqueConfig `json:"clique,omitempty"`
+	Ethash   *EthashConfig   `json:"ethash,omitempty"`
+	Clique   *CliqueConfig   `json:"clique,omitempty"`
+	Poseidon *PoseidonConfig `json:"poseidon,omitempty"`
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.
@@ -340,6 +390,16 @@ func (c *CliqueConfig) String() string {
 	return "clique"
 }
 
+// PoseidonConfig is the consensus engine configs for proof-of-staked-authority based sealing.
+type PoseidonConfig struct {
+	Period uint64 `json:"period"` // Number of seconds between blocks to enforce
+}
+
+// String implements the stringer interface, returning the consensus engine details.
+func (b *PoseidonConfig) String() string {
+	return "poseidon"
+}
+
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
 	var engine interface{}
@@ -348,6 +408,8 @@ func (c *ChainConfig) String() string {
 		engine = c.Ethash
 	case c.Clique != nil:
 		engine = c.Clique
+	case c.Poseidon != nil:
+		engine = c.Poseidon
 	default:
 		engine = "unknown"
 	}

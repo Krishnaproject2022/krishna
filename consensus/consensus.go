@@ -125,3 +125,11 @@ type PoW interface {
 	// Hashrate returns the current mining hashrate of a PoW consensus engine.
 	Hashrate() float64
 }
+
+type PoSA interface {
+	Engine
+
+	Heartbeat(number *big.Int) error
+
+	GetSystemTransaction(signer types.Signer, state *state.StateDB, baseFee *big.Int, totalFee *big.Int) (*types.TransactionsByPriceAndNonce,error)
+}

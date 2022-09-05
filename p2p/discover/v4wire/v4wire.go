@@ -192,15 +192,21 @@ func Expired(ts uint64) bool {
 // Encoder/decoder.
 
 const (
-	macSize  = 32
-	sigSize  = crypto.SignatureLength
-	headSize = macSize + sigSize // space of packet frame data
+	prefixSize = 4
+	macSize    = 32 + prefixSize
+	sigSize    = crypto.SignatureLength
+	headSize   = macSize + sigSize // space of packet frame data
+)
+
+var (
+	prefixv4 = []byte{0x4b, 0x53, 0x41, 0x4e}
 )
 
 var (
 	ErrPacketTooSmall = errors.New("too small")
 	ErrBadHash        = errors.New("bad hash")
 	ErrBadPoint       = errors.New("invalid curve point")
+	ErrPacketBadMagic = errors.New("invalid magic")
 )
 
 var headSpace = make([]byte, headSize)
@@ -210,7 +216,10 @@ func Decode(input []byte) (Packet, Pubkey, []byte, error) {
 	if len(input) < headSize+1 {
 		return nil, Pubkey{}, nil, ErrPacketTooSmall
 	}
-	hash, sig, sigdata := input[:macSize], input[macSize:headSize], input[headSize:]
+	magic, hash, sig, sigdata := input[:prefixSize], input[prefixSize:macSize], input[macSize:headSize], input[headSize:]
+	if !bytes.Equal(magic, prefixv4) {
+		return nil, Pubkey{}, nil, ErrPacketBadMagic
+	}
 	shouldhash := crypto.Keccak256(input[macSize:])
 	if !bytes.Equal(hash, shouldhash) {
 		return nil, Pubkey{}, nil, ErrBadHash
@@ -258,7 +267,8 @@ func Encode(priv *ecdsa.PrivateKey, req Packet) (packet, hash []byte, err error)
 	copy(packet[macSize:], sig)
 	// Add the hash to the front. Note: this doesn't protect the packet in any way.
 	hash = crypto.Keccak256(packet[macSize:])
-	copy(packet, hash)
+	copy(packet[prefixSize:], hash)
+	copy(packet, prefixv4)
 	return packet, hash, nil
 }
 
